@@ -2,6 +2,7 @@
 
 Endpoints:
   POST /api/chat              -> route a message through the LangGraph workflow
+  POST /api/chat/stream       -> same turn, streamed as SSE token events
   POST /api/portfolio/analyze -> deterministic portfolio metrics (no LLM)
   GET  /api/market/{symbol}   -> live quote + 6mo history
   GET  /api/market/{symbol}/news
@@ -11,9 +12,13 @@ Endpoints:
 
 from __future__ import annotations
 
+import json
+
 from fastapi import FastAPI, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from sse_starlette.sse import EventSourceResponse
+from starlette.concurrency import iterate_in_threadpool
 
 from src.core.config import get_config
 from src.core.logging import get_logger
@@ -56,6 +61,26 @@ async def chat(req: ChatRequest) -> ChatResponse:
     except Exception as exc:  # noqa: BLE001
         logger.exception("Chat turn failed")
         raise HTTPException(status_code=500, detail=f"Chat failed: {exc}") from exc
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(req: ChatRequest) -> EventSourceResponse:
+    """Stream a chat turn as SSE: route -> token... -> done."""
+    from src.workflow.graph import stream_turn
+
+    events = stream_turn(
+        req.session_id,
+        req.message,
+        [h.model_dump() for h in req.holdings] if req.holdings else None,
+        req.goal_params,
+    )
+
+    async def event_source():
+        # LangGraph streaming is synchronous; iterate it off the event loop.
+        async for event in iterate_in_threadpool(events):
+            yield {"data": json.dumps(event)}
+
+    return EventSourceResponse(event_source())
 
 
 @app.post("/api/portfolio/analyze")

@@ -8,6 +8,7 @@ interface Message {
   content: string
   agent?: string
   citations?: Citation[]
+  streaming?: boolean
 }
 
 const AGENT_LABELS: Record<string, string> = {
@@ -40,6 +41,7 @@ export default function ChatTab() {
   const [messages, setMessages] = useState<Message[]>([WELCOME])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [waiting, setWaiting] = useState(false) // before the first token arrives
   const [error, setError] = useState('')
   const [sessionId] = useState(() => `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -48,49 +50,94 @@ export default function ChatTab() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, busy])
 
+  function updateLast(patch: (m: Message) => Message) {
+    setMessages((all) => all.map((m, i) => (i === all.length - 1 ? patch(m) : m)))
+  }
+
   async function send(text?: string) {
     const message = (text ?? input).trim()
     if (!message || busy) return
     setInput('')
     setError('')
-    setMessages((m) => [...m, { role: 'user', content: message }])
     setBusy(true)
+    setWaiting(true)
+    setMessages((m) => [
+      ...m,
+      { role: 'user', content: message },
+      { role: 'assistant', content: '', streaming: true },
+    ])
+
+    let receivedTokens = false
     try {
-      const res = await api.chat(message, sessionId)
-      setMessages((m) => [
-        ...m,
-        { role: 'assistant', content: res.content, agent: res.agent, citations: res.citations },
-      ])
+      await api.chatStream(message, sessionId, {
+        onRoute: (route) => updateLast((m) => ({ ...m, agent: route })),
+        onToken: (t) => {
+          receivedTokens = true
+          setWaiting(false)
+          updateLast((m) => ({ ...m, content: m.content + t }))
+        },
+        onDone: (res) => {
+          setWaiting(false)
+          updateLast(() => ({
+            role: 'assistant',
+            content: res.content,
+            agent: res.agent,
+            citations: res.citations,
+          }))
+        },
+        onError: (detail) => setError(detail),
+      })
     } catch (e: any) {
-      setError(e.message || 'Something went wrong — please try again.')
+      // Stream transport failed — fall back to the non-streaming endpoint
+      // unless we already rendered partial output.
+      if (!receivedTokens) {
+        try {
+          const res = await api.chat(message, sessionId)
+          updateLast(() => ({
+            role: 'assistant',
+            content: res.content,
+            agent: res.agent,
+            citations: res.citations,
+          }))
+        } catch (e2: any) {
+          setMessages((m) => m.slice(0, -1)) // drop the empty placeholder
+          setError(e2.message || 'Something went wrong — please try again.')
+        }
+      } else {
+        setError(e.message || 'The response was interrupted — please try again.')
+        updateLast((m) => ({ ...m, streaming: false }))
+      }
     } finally {
       setBusy(false)
+      setWaiting(false)
     }
   }
 
   return (
     <div className="panel chat-window">
       <div className="chat-messages">
-        {messages.map((m, i) => (
-          <motion.div
-            key={i}
-            className={`msg ${m.role}`}
-            initial={{ opacity: 0, y: 14, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-          >
-            {m.role === 'assistant' && m.agent && (
-              <span className="agent-badge">{AGENT_LABELS[m.agent] ?? m.agent}</span>
-            )}
-            {m.role === 'assistant' ? <ReactMarkdown>{m.content}</ReactMarkdown> : m.content}
-            {m.citations && m.citations.length > 0 && (
-              <div className="citations">
-                📚 Sources: {m.citations.map((c) => c.title).join(' · ')}
-              </div>
-            )}
-          </motion.div>
-        ))}
-        {busy && (
+        {messages.map((m, i) =>
+          m.streaming && !m.content ? null : ( // dots cover the pre-token phase
+            <motion.div
+              key={i}
+              className={`msg ${m.role}${m.streaming ? ' streaming' : ''}`}
+              initial={{ opacity: 0, y: 14, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            >
+              {m.role === 'assistant' && m.agent && (
+                <span className="agent-badge">{AGENT_LABELS[m.agent] ?? m.agent}</span>
+              )}
+              {m.role === 'assistant' ? <ReactMarkdown>{m.content}</ReactMarkdown> : m.content}
+              {m.citations && m.citations.length > 0 && (
+                <div className="citations">
+                  📚 Sources: {m.citations.map((c) => c.title).join(' · ')}
+                </div>
+              )}
+            </motion.div>
+          ),
+        )}
+        {waiting && (
           <motion.div
             className="msg assistant typing"
             initial={{ opacity: 0, y: 8 }}

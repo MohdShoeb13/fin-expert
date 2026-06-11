@@ -5,7 +5,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from src.agents.base_agent import AgentResponse
 from src.workflow import graph as graph_module
-from src.workflow.graph import FALLBACK_MESSAGE, build_graph, run_turn
+from src.workflow.graph import FALLBACK_MESSAGE, build_graph, run_turn, stream_turn
 from src.workflow.router import ROUTES
 
 
@@ -99,6 +99,49 @@ def test_session_memory_preserved_across_turns(monkeypatch, stub_routing, tmp_pa
     assert seen_history_lengths[0] == 0
     assert seen_history_lengths[1] == 2
     assert seen_history_lengths[2] == 0
+
+
+class TestStreamTurn:
+    def test_event_sequence_route_then_done(self, monkeypatch, stub_routing):
+        patch_agent(monkeypatch, StubAgent())
+        monkeypatch.setattr(
+            graph_module, "get_workflow", lambda: build_graph(checkpointer=False)
+        )
+
+        events = list(stream_turn("stream-s1", "What is a bond?"))
+        types = [e["type"] for e in events]
+
+        assert types[0] == "route"
+        assert events[0]["route"] == "finance_qa"
+        assert types[-1] == "done"
+        done = events[-1]["response"]
+        assert "Educational answer to: What is a bond?" in done["content"]
+        assert done["route"] == "finance_qa"
+        assert done["citations"]
+
+    def test_agent_crash_still_ends_with_safe_done(self, monkeypatch, stub_routing):
+        patch_agent(monkeypatch, ExplodingAgent())
+        monkeypatch.setattr(
+            graph_module, "get_workflow", lambda: build_graph(checkpointer=False)
+        )
+
+        events = list(stream_turn("stream-s2", "boom"))
+        done = events[-1]
+        assert done["type"] == "done"
+        # The agent node catches its own exception -> safe fallback response.
+        assert done["response"]["content"] == FALLBACK_MESSAGE
+
+    def test_graph_failure_yields_error_then_done(self, monkeypatch):
+        class BrokenWorkflow:
+            def stream(self, *a, **kw):
+                raise RuntimeError("graph exploded")
+
+        monkeypatch.setattr(graph_module, "get_workflow", lambda: BrokenWorkflow())
+
+        events = list(stream_turn("stream-s3", "hi"))
+        types = [e["type"] for e in events]
+        assert types == ["error", "done"]
+        assert events[-1]["response"]["content"] == FALLBACK_MESSAGE
 
 
 def test_holdings_passed_to_portfolio_agent(monkeypatch):

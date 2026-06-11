@@ -154,6 +154,14 @@ button { font-family: inherit; }
 }
 .citations { margin-top: 8px; font-size: 0.78rem; color: var(--text-dim); }
 
+.msg.streaming > :last-child::after {
+  content: '▍';
+  color: var(--accent);
+  margin-left: 2px;
+  animation: blink 1s steps(2) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
 .typing { display: flex; gap: 5px; align-items: center; padding: 14px 16px; }
 .typing .dot {
   width: 7px;

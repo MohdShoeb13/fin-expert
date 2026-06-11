@@ -124,6 +124,14 @@ All extend `base_agent.py` (LLM from registry, shared guardrails, mandatory educ
 - Per-component: sliding tab pill (`layoutId`), spring-in chat messages, animated 3-dot typing indicator, staggered metric cards with count-up numbers on Portfolio/Market/Goals, chart + news reveals.
 - **Verified with headless Chrome (Playwright)**: screenshots of all 4 tabs with live data; chat conversation survives tab switches (regression check passed); no console errors (one benign favicon 404). `npm run build` passes TS strict; bundle 844 kB minified / 246 kB gzip (+130 kB raw for framer-motion). Backend suite still 162 passed / 94%.
 
+### 12. Streaming chat (SSE) ✅ (2026-06-11)
+- **`POST /api/chat/stream`** — ChatGPT-style token streaming. LangGraph `stream_mode=["updates","messages"]` in `stream_turn()` (`src/workflow/graph.py`); event protocol: `route` (agent badge appears immediately) → `token`× n → `done` (full response with disclaimer + citations), `error` on failure. Router tokens and full-message state updates are filtered out (`AIMessageChunk` check).
+- Served via `sse-starlette` `EventSourceResponse` with the sync generator iterated in a threadpool; non-streaming `/api/chat` kept for compatibility.
+- Frontend: `api.chatStream()` parses SSE over `fetch` + `ReadableStream` (handles `\r\n` frame endings — sse-starlette uses them; this was a real bug found in browser testing); ChatTab renders tokens into a live placeholder with a blinking cursor, typing dots only until the first token, and **falls back to the non-streaming endpoint** if the stream fails before any token.
+- nginx config: `proxy_buffering off` for SSE in Docker.
+- **Verified**: curl shows route/token/done events through both :8000 and the Vite proxy; headless Chrome confirmed incremental DOM growth with streaming cursor, then a clean final message (badge, citations, disclaimer). 4 new tests (stream event sequence, agent-crash fallback, graph-failure error event, SSE endpoint) — suite now **166 passed, ~94%**.
+- Note: heavy test traffic can hit the Gemini free-tier per-minute limit; the LLM retries internally and the stream completes late rather than failing.
+
 ### Live end-to-end verification ✅ (2026-06-11)
 
 With Groq + Gemini keys in `.env`, the chat pipeline was verified live:

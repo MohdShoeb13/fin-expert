@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 
 from src.core.config import PROJECT_ROOT, get_config
 from src.core.logging import get_logger
@@ -116,6 +116,23 @@ def get_workflow():
     return _compiled
 
 
+def _build_state(message: str, holdings: list[dict] | None, goal_params: dict | None) -> dict:
+    state: dict = {"messages": [HumanMessage(content=message)]}
+    if holdings:
+        state["holdings"] = holdings
+    if goal_params:
+        state["goal_params"] = goal_params
+    return state
+
+
+_FALLBACK_RESPONSE = {
+    "content": FALLBACK_MESSAGE,
+    "agent": "unknown",
+    "citations": [],
+    "data": {},
+}
+
+
 def run_turn(
     session_id: str,
     message: str,
@@ -124,18 +141,61 @@ def run_turn(
 ) -> dict:
     """Run one conversational turn for a session; returns AgentResponse dict."""
     workflow = get_workflow()
-    state: dict = {"messages": [HumanMessage(content=message)]}
-    if holdings:
-        state["holdings"] = holdings
-    if goal_params:
-        state["goal_params"] = goal_params
+    state = _build_state(message, holdings, goal_params)
 
     result = workflow.invoke(state, config={"configurable": {"thread_id": session_id}})
-    response = result.get("agent_response") or {
-        "content": FALLBACK_MESSAGE,
-        "agent": "unknown",
-        "citations": [],
-        "data": {},
-    }
+    response = result.get("agent_response") or dict(_FALLBACK_RESPONSE)
     response["route"] = result.get("route", "")
     return response
+
+
+def stream_turn(
+    session_id: str,
+    message: str,
+    holdings: list[dict] | None = None,
+    goal_params: dict | None = None,
+):
+    """Run one turn, yielding events as the LLM generates tokens.
+
+    Events:
+        {"type": "route", "route": str}      router decided which agent handles it
+        {"type": "token", "text": str}       one LLM token from the agent node
+        {"type": "done", "response": dict}   final AgentResponse (disclaimer, citations)
+        {"type": "error", "detail": str}     unrecoverable failure (still followed by done)
+    """
+    workflow = get_workflow()
+    state = _build_state(message, holdings, goal_params)
+
+    route = ""
+    response: dict | None = None
+    try:
+        for mode, payload in workflow.stream(
+            state,
+            config={"configurable": {"thread_id": session_id}},
+            stream_mode=["updates", "messages"],
+        ):
+            if mode == "updates":
+                for node, update in (payload or {}).items():
+                    if not isinstance(update, dict):
+                        continue
+                    if node == "router" and update.get("route"):
+                        route = update["route"]
+                        yield {"type": "route", "route": route}
+                    elif update.get("agent_response"):
+                        response = update["agent_response"]
+            elif mode == "messages":
+                chunk, metadata = payload
+                if metadata.get("langgraph_node") == "router":
+                    continue  # classification tokens are not part of the answer
+                if not isinstance(chunk, AIMessageChunk):
+                    continue  # full AIMessages from state updates would duplicate the text
+                text = chunk.content if isinstance(chunk.content, str) else str(chunk.content)
+                if text:
+                    yield {"type": "token", "text": text}
+    except Exception as exc:  # noqa: BLE001 - stream must always terminate cleanly
+        logger.exception("Streaming turn failed")
+        yield {"type": "error", "detail": str(exc)}
+
+    final = response or dict(_FALLBACK_RESPONSE)
+    final["route"] = route
+    yield {"type": "done", "response": final}

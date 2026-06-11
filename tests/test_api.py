@@ -126,6 +126,36 @@ class TestChat:
         res = client.post("/api/chat", json={"message": "", "session_id": "s"})
         assert res.status_code == 422
 
+    def test_chat_stream_emits_sse_events(self, monkeypatch):
+        import json
+
+        import src.workflow.graph as graph_module
+
+        def fake_stream_turn(session_id, message, holdings=None, goal_params=None):
+            yield {"type": "route", "route": "finance_qa"}
+            yield {"type": "token", "text": "Hello"}
+            yield {"type": "token", "text": " world"}
+            yield {"type": "done", "response": {
+                "content": "Hello world", "agent": "finance_qa",
+                "route": "finance_qa", "citations": [], "data": {},
+            }}
+
+        monkeypatch.setattr(graph_module, "stream_turn", fake_stream_turn)
+        with client.stream("POST", "/api/chat/stream", json={
+            "message": "hi", "session_id": "s",
+        }) as res:
+            assert res.status_code == 200
+            assert res.headers["content-type"].startswith("text/event-stream")
+            body = "".join(res.iter_text())
+
+        events = [
+            json.loads(line[5:]) for line in body.splitlines() if line.startswith("data:")
+        ]
+        types = [e["type"] for e in events]
+        assert types == ["route", "token", "token", "done"]
+        assert "".join(e["text"] for e in events if e["type"] == "token") == "Hello world"
+        assert events[-1]["response"]["content"] == "Hello world"
+
     def test_chat_failure_500(self, monkeypatch):
         import src.workflow.graph as graph_module
 

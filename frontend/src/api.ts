@@ -93,12 +93,67 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+export interface StreamHandlers {
+  onRoute?: (route: string) => void
+  onToken?: (text: string) => void
+  onDone?: (response: ChatResponse) => void
+  onError?: (detail: string) => void
+}
+
+/** POST + SSE: parses `data: {json}` events from the chat stream. */
+async function chatStream(
+  message: string,
+  sessionId: string,
+  handlers: StreamHandlers,
+  holdings?: Holding[],
+): Promise<void> {
+  const res = await fetch('/api/chat/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, session_id: sessionId, holdings }),
+  })
+  if (!res.ok || !res.body) {
+    throw new Error(`Stream request failed: ${res.status}`)
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    // SSE frames end with a blank line; servers may use \n or \r\n.
+    const frames = buffer.split(/\r?\n\r?\n/)
+    buffer = frames.pop() ?? '' // keep the trailing partial frame
+    for (const frame of frames) {
+      for (const line of frame.split(/\r?\n/)) {
+        if (!line.startsWith('data:')) continue
+        let event: any
+        try {
+          event = JSON.parse(line.slice(5).trim())
+        } catch {
+          continue
+        }
+        if (event.type === 'route') handlers.onRoute?.(event.route)
+        else if (event.type === 'token') handlers.onToken?.(event.text)
+        else if (event.type === 'done') handlers.onDone?.(event.response)
+        else if (event.type === 'error') handlers.onError?.(event.detail)
+      }
+    }
+  }
+}
+
 export const api = {
   chat: (message: string, sessionId: string, holdings?: Holding[]) =>
     request<ChatResponse>('/api/chat', {
       method: 'POST',
       body: JSON.stringify({ message, session_id: sessionId, holdings }),
     }),
+
+  chatStream,
 
   analyzePortfolio: (holdings: Holding[]) =>
     request<PortfolioAnalysis>('/api/portfolio/analyze', {
