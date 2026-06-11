@@ -1,0 +1,62 @@
+# AI Finance Assistant configuration
+#
+# Multi-LLM strategy: each agent is mapped to the provider best suited to it.
+#   - groq:   ultra-low latency -> query routing/classification
+#   - gemini: generous free tier -> high-volume RAG-grounded agents
+#   - openai: strong reasoning -> calculation-heavy agents
+# Swap any agent's model here without touching code.
+
+llm:
+  providers:
+    openai:
+      model: gpt-4o-mini
+      temperature: 0.3
+      api_key_env: OPENAI_API_KEY
+    gemini:
+      model: gemini-2.5-flash   # 2.0-flash has no free-tier quota anymore
+      temperature: 0.3
+      api_key_env: GOOGLE_API_KEY
+    groq:
+      model: llama-3.3-70b-versatile
+      temperature: 0.0
+      api_key_env: GROQ_API_KEY
+
+  # agent -> provider assignment
+  agents:
+    router: groq
+    finance_qa: gemini
+    portfolio_analysis: openai
+    market_analysis: gemini
+    goal_planning: openai
+    news_synthesizer: gemini
+    tax_education: gemini
+
+rag:
+  knowledge_base_dir: knowledge_base
+  index_dir: .faiss_index
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  chunk_size: 800
+  chunk_overlap: 120
+  top_k: 4
+  relevance_threshold: 0.25
+
+market_data:
+  cache_ttl_seconds: 1800        # 30-minute TTL per project FAQ
+  max_retries: 3
+  backoff_base_seconds: 1.0
+  alpha_vantage_base_url: https://www.alphavantage.co/query
+  alpha_vantage_key_env: ALPHAVANTAGE_API_KEY
+
+workflow:
+  checkpoint_db: .checkpoints/conversations.sqlite
+  max_history_messages: 20
+
+server:
+  host: 0.0.0.0
+  port: 8000
+  cors_origins:
+    - http://localhost:5173
+    - http://localhost:3000
+
+logging:
+  level: INFO

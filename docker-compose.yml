@@ -1,0 +1,25 @@
+services:
+  backend:
+    build: .
+    env_file:
+      - path: .env
+        required: false  # works without keys; /api/chat needs at least one LLM key
+    ports:
+      - "8000:8000"
+    volumes:
+      - checkpoints:/app/.checkpoints
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  checkpoints:

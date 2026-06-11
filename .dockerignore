@@ -1,0 +1,14 @@
+.venv/
+.git/
+.checkpoints/
+.faiss_index/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+frontend/node_modules/
+frontend/dist/
+.env
+docs/
+tests/
