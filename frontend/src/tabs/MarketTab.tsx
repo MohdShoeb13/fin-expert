@@ -3,6 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 import { api, HistoryPoint, Quote } from '../api'
+import { AnimatedNumber, FadeIn, Stagger, StaggerItem } from '../motion'
 
 const POPULAR = ['SPY', 'QQQ', 'AAPL', 'MSFT', 'NVDA', 'VTI']
 const PERIODS = ['1mo', '3mo', '6mo', '1y', '5y']
@@ -79,32 +80,34 @@ export default function MarketTab() {
 
       {quote && !busy && (
         <>
-          <div className="metric-row">
-            <div className="metric">
+          <Stagger className="metric-row">
+            <StaggerItem className="metric">
               <div className="label">{quote.name || quote.symbol}</div>
-              <div className="value">${quote.price.toLocaleString()}</div>
-            </div>
-            <div className="metric">
+              <div className="value">
+                <AnimatedNumber value={quote.price} prefix="$" decimals={2} />
+              </div>
+            </StaggerItem>
+            <StaggerItem className="metric">
               <div className="label">Today</div>
               <div className={`value ${quote.change_percent >= 0 ? 'green' : 'red'}`}>
                 {quote.change_percent >= 0 ? '+' : ''}{quote.change_percent.toFixed(2)}%
               </div>
-            </div>
-            <div className="metric">
+            </StaggerItem>
+            <StaggerItem className="metric">
               <div className="label">Market cap</div>
               <div className="value">{fmtBig(quote.market_cap)}</div>
-            </div>
-            <div className="metric">
+            </StaggerItem>
+            <StaggerItem className="metric">
               <div className="label">P/E ratio</div>
               <div className="value">{quote.pe_ratio ? quote.pe_ratio.toFixed(1) : '—'}</div>
-            </div>
-            <div className="metric">
+            </StaggerItem>
+            <StaggerItem className="metric">
               <div className="label">52-week range</div>
               <div className="value" style={{ fontSize: '1rem' }}>
                 {quote.fifty_two_week_low ? `$${quote.fifty_two_week_low.toFixed(0)} – $${quote.fifty_two_week_high?.toFixed(0)}` : '—'}
               </div>
-            </div>
-          </div>
+            </StaggerItem>
+          </Stagger>
 
           {quote.stale && (
             <div className="stale-note">
@@ -112,6 +115,7 @@ export default function MarketTab() {
             </div>
           )}
 
+          <FadeIn delay={0.15}>
           <div className="chart-card" style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3>{symbol} — closing price</h3>
@@ -141,8 +145,10 @@ export default function MarketTab() {
               Data: {quote.provider} · as of {new Date(quote.as_of).toLocaleString()}
             </div>
           </div>
+          </FadeIn>
 
           {news.length > 0 && (
+            <FadeIn delay={0.25}>
             <div style={{ marginTop: 18 }}>
               <h3 style={{ marginBottom: 6 }}>Recent news</h3>
               {news.slice(0, 6).map((n, i) => (
@@ -152,6 +158,7 @@ export default function MarketTab() {
                 </div>
               ))}
             </div>
+            </FadeIn>
           )}
         </>
       )}

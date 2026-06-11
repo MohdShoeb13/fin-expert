@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import { api, Citation } from '../api'
 
@@ -71,7 +72,13 @@ export default function ChatTab() {
     <div className="panel chat-window">
       <div className="chat-messages">
         {messages.map((m, i) => (
-          <div key={i} className={`msg ${m.role}`}>
+          <motion.div
+            key={i}
+            className={`msg ${m.role}`}
+            initial={{ opacity: 0, y: 14, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+          >
             {m.role === 'assistant' && m.agent && (
               <span className="agent-badge">{AGENT_LABELS[m.agent] ?? m.agent}</span>
             )}
@@ -81,9 +88,19 @@ export default function ChatTab() {
                 📚 Sources: {m.citations.map((c) => c.title).join(' · ')}
               </div>
             )}
-          </div>
+          </motion.div>
         ))}
-        {busy && <div className="spinner">Thinking…</div>}
+        {busy && (
+          <motion.div
+            className="msg assistant typing"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <span className="dot" />
+            <span className="dot" />
+            <span className="dot" />
+          </motion.div>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -102,6 +119,7 @@ export default function ChatTab() {
         </button>
       </div>
 
+      {messages.length === 1 && <div className="suggestions-hint">✨ Try one of these to get started:</div>}
       <div className="chat-suggestions">
         {SUGGESTIONS.map((s) => (
           <button key={s} onClick={() => send(s)} disabled={busy}>

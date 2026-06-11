@@ -3,6 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from 'recharts'
 import { api, GoalProjection } from '../api'
+import { AnimatedNumber, FadeIn, Stagger, StaggerItem } from '../motion'
 
 export default function GoalsTab() {
   const [target, setTarget] = useState(100000)
@@ -77,29 +78,37 @@ export default function GoalsTab() {
 
       {projection && (
         <>
-          <div className="metric-row">
-            <div className="metric">
+          <Stagger className="metric-row">
+            <StaggerItem className="metric">
               <div className="label">Projected balance</div>
               <div className={`value ${projection.goal_met ? 'green' : 'amber'}`}>
-                ${Math.round(projection.projected_final).toLocaleString()}
+                <AnimatedNumber value={Math.round(projection.projected_final)} prefix="$" />
               </div>
-            </div>
-            <div className="metric">
+            </StaggerItem>
+            <StaggerItem className="metric">
               <div className="label">Goal</div>
-              <div className="value">${projection.target_amount.toLocaleString()}</div>
-            </div>
-            <div className="metric">
+              <div className="value">
+                <AnimatedNumber value={projection.target_amount} prefix="$" />
+              </div>
+            </StaggerItem>
+            <StaggerItem className="metric">
               <div className="label">{projection.goal_met ? 'Surplus' : 'Shortfall'}</div>
               <div className={`value ${projection.goal_met ? 'green' : 'red'}`}>
-                ${Math.round(Math.abs(projection.projected_final - projection.target_amount)).toLocaleString()}
+                <AnimatedNumber
+                  value={Math.round(Math.abs(projection.projected_final - projection.target_amount))}
+                  prefix="$"
+                />
               </div>
-            </div>
-            <div className="metric">
+            </StaggerItem>
+            <StaggerItem className="metric">
               <div className="label">Monthly needed for goal</div>
-              <div className="value">${projection.required_monthly_for_goal.toLocaleString()}</div>
-            </div>
-          </div>
+              <div className="value">
+                <AnimatedNumber value={projection.required_monthly_for_goal} prefix="$" />
+              </div>
+            </StaggerItem>
+          </Stagger>
 
+          <FadeIn delay={0.2}>
           <div className="chart-card" style={{ marginTop: 8 }}>
             <h3>
               Growth projection — {projection.risk_profile} profile (
@@ -117,13 +126,16 @@ export default function GoalsTab() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
+          </FadeIn>
 
           {!projection.goal_met && (
-            <div className="warning-item" style={{ marginTop: 12 }}>
-              💡 To reach ${projection.target_amount.toLocaleString()} in {projection.years} years at this
-              risk level, you'd need about <b>${projection.required_monthly_for_goal.toLocaleString()}/month</b> —
-              or you could extend the timeline, adjust the target, or discuss trade-offs in the Chat tab.
-            </div>
+            <FadeIn delay={0.35}>
+              <div className="warning-item" style={{ marginTop: 12 }}>
+                💡 To reach ${projection.target_amount.toLocaleString()} in {projection.years} years at this
+                risk level, you'd need about <b>${projection.required_monthly_for_goal.toLocaleString()}/month</b> —
+                or you could extend the timeline, adjust the target, or discuss trade-offs in the Chat tab.
+              </div>
+            </FadeIn>
           )}
         </>
       )}

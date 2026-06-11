@@ -3,6 +3,7 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
 } from 'recharts'
 import { api, Holding, PortfolioAnalysis } from '../api'
+import { AnimatedNumber, FadeIn, Stagger, StaggerItem } from '../motion'
 
 const COLORS = ['#38bdf8', '#4ade80', '#fbbf24', '#f87171', '#a78bfa', '#fb923c', '#2dd4bf', '#f472b6']
 
@@ -112,30 +113,34 @@ export default function PortfolioTab() {
 
       {analysis && (
         <>
-          <div className="metric-row">
-            <div className="metric">
+          <Stagger className="metric-row">
+            <StaggerItem className="metric">
               <div className="label">Total value</div>
-              <div className="value">${analysis.total_value.toLocaleString()}</div>
-            </div>
-            <div className="metric">
+              <div className="value">
+                <AnimatedNumber value={analysis.total_value} prefix="$" decimals={2} />
+              </div>
+            </StaggerItem>
+            <StaggerItem className="metric">
               <div className="label">Diversification</div>
               <div className={`value ${analysis.diversification_score > 60 ? 'green' : analysis.diversification_score > 30 ? 'amber' : 'red'}`}>
-                {analysis.diversification_score}/100
+                <AnimatedNumber value={analysis.diversification_score} suffix="/100" />
               </div>
-            </div>
-            <div className="metric">
+            </StaggerItem>
+            <StaggerItem className="metric">
               <div className="label">Risk score</div>
-              <div className="value">{analysis.risk_score}/100</div>
-            </div>
-            <div className="metric">
+              <div className="value">
+                <AnimatedNumber value={analysis.risk_score} suffix="/100" />
+              </div>
+            </StaggerItem>
+            <StaggerItem className="metric">
               <div className="label">Risk level</div>
               <div className={`value ${analysis.risk_level === 'Aggressive' ? 'red' : analysis.risk_level === 'Moderate' ? 'amber' : 'green'}`}>
                 {analysis.risk_level}
               </div>
-            </div>
-          </div>
+            </StaggerItem>
+          </Stagger>
 
-          <div className="charts-row">
+          <FadeIn className="charts-row" delay={0.2}>
             <div className="chart-card">
               <h3>Allocation by holding</h3>
               <ResponsiveContainer width="100%" height={260}>
@@ -168,7 +173,7 @@ export default function PortfolioTab() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </FadeIn>
 
           <table className="holdings-table">
             <thead>
@@ -192,11 +197,11 @@ export default function PortfolioTab() {
           </table>
 
           {analysis.warnings.length > 0 && (
-            <div className="warning-list">
+            <Stagger className="warning-list">
               {analysis.warnings.map((w, i) => (
-                <div key={i} className="warning-item">⚠️ {w}</div>
+                <StaggerItem key={i} className="warning-item">⚠️ {w}</StaggerItem>
               ))}
-            </div>
+            </Stagger>
           )}
         </>
       )}

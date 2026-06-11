@@ -117,6 +117,13 @@ All extend `base_agent.py` (LLM from registry, shared guardrails, mandatory educ
 - `docs/TechnicalDesign.md` — design decisions and trade-offs (LangGraph, multi-provider strategy, RAG params, market-data resilience, deterministic-core principle, testing strategy, known limitations).
 - `docs/DemoScript.md` — 5–7 min demo video walkthrough with pre-flight checklist.
 
+### 11. Frontend design polish ✅ (2026-06-11)
+- **framer-motion** installed (it was missing despite an earlier attempted install) and wired throughout.
+- Visual glow-up (`styles.css`, `index.html`): gradient mesh background, glassmorphism panels (backdrop blur + translucent borders), sky→indigo accent gradient on buttons/badges/active tab, gradient header text, Inter font, hover lift + glow on metric cards, styled scrollbar, focus rings.
+- Motion layer (`frontend/src/motion.tsx`): `FadeIn`, `Stagger`/`StaggerItem`, `AnimatedNumber` (spring count-up); `MotionConfig reducedMotion="user"` respects OS settings.
+- Per-component: sliding tab pill (`layoutId`), spring-in chat messages, animated 3-dot typing indicator, staggered metric cards with count-up numbers on Portfolio/Market/Goals, chart + news reveals.
+- **Verified with headless Chrome (Playwright)**: screenshots of all 4 tabs with live data; chat conversation survives tab switches (regression check passed); no console errors (one benign favicon 404). `npm run build` passes TS strict; bundle 844 kB minified / 246 kB gzip (+130 kB raw for framer-motion). Backend suite still 162 passed / 94%.
+
 ### Live end-to-end verification ✅ (2026-06-11)
 
 With Groq + Gemini keys in `.env`, the chat pipeline was verified live:
