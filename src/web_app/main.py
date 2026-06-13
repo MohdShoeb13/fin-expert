@@ -101,12 +101,17 @@ async def market_quote(symbol: str, period: str = "6mo") -> dict:
     svc = get_market_data_service()
     try:
         quote = await run_in_threadpool(svc.get_quote, symbol)
-        history = await run_in_threadpool(svc.get_history, symbol, period)
-        return {"quote": quote.to_dict(), "history": [vars(p) for p in history]}
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except MarketDataUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # A valid quote should still render even if history alone is unavailable.
+    try:
+        history = await run_in_threadpool(svc.get_history, symbol, period)
+    except MarketDataUnavailable:
+        return {"quote": quote.to_dict(), "history": [], "history_unavailable": True}
+    return {"quote": quote.to_dict(), "history": [vars(p) for p in history]}
 
 
 @app.get("/api/market/{symbol}/news")

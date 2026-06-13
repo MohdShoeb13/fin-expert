@@ -22,6 +22,7 @@ export default function MarketTab() {
   const [period, setPeriod] = useState('6mo')
   const [quote, setQuote] = useState<Quote | null>(null)
   const [history, setHistory] = useState<HistoryPoint[]>([])
+  const [historyMissing, setHistoryMissing] = useState(false)
   const [news, setNews] = useState<Array<Record<string, string>>>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -39,6 +40,7 @@ export default function MarketTab() {
         if (cancelled) return
         setQuote(data.quote)
         setHistory(data.history)
+        setHistoryMissing(Boolean(data.history_unavailable))
         setNews(newsData.articles ?? [])
       } catch (e: any) {
         if (!cancelled) setError(e.message)
@@ -132,15 +134,21 @@ export default function MarketTab() {
                 ))}
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={history}>
-                <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
-                <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} minTickGap={40} />
-                <YAxis stroke="#94a3b8" fontSize={11} domain={['auto', 'auto']} />
-                <Tooltip formatter={(v: any) => [`$${v}`, 'Close']} />
-                <Line type="monotone" dataKey="close" stroke="#38bdf8" dot={false} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
+            {historyMissing ? (
+              <div className="stale-note" style={{ padding: '40px 0', textAlign: 'center' }}>
+                ⚠️ Price history is temporarily unavailable — the quote above is still live.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={history}>
+                  <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
+                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} minTickGap={40} />
+                  <YAxis stroke="#94a3b8" fontSize={11} domain={['auto', 'auto']} />
+                  <Tooltip formatter={(v: any) => [`$${v}`, 'Close']} />
+                  <Line type="monotone" dataKey="close" stroke="#38bdf8" dot={false} strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
             <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', marginTop: 6 }}>
               Data: {quote.provider} · as of {new Date(quote.as_of).toLocaleString()}
             </div>

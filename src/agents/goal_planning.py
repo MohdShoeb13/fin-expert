@@ -66,7 +66,8 @@ class GoalPlanningAgent(BaseAgent):
         params.pop("symbols", None)
 
         required = {"target_amount", "years", "monthly_contribution"}
-        missing = required - {k for k, v in params.items() if v}
+        # Check presence, not truthiness — a $0 monthly contribution is valid.
+        missing = required - {k for k, v in params.items() if v is not None}
         if missing:
             text = self._invoke(
                 self._build_messages(

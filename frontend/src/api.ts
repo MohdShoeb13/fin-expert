@@ -162,7 +162,7 @@ export const api = {
     }),
 
   marketQuote: (symbol: string, period = '6mo') =>
-    request<{ quote: Quote; history: HistoryPoint[] }>(
+    request<{ quote: Quote; history: HistoryPoint[]; history_unavailable?: boolean }>(
       `/api/market/${encodeURIComponent(symbol)}?period=${period}`,
     ),
 

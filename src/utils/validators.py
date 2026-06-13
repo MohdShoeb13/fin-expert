@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import re
 
-_TICKER_RE = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
+# Allows a leading "^" for index symbols (e.g. ^GSPC, ^IXIC, ^DJI).
+_TICKER_RE = re.compile(r"^\^?[A-Z][A-Z0-9.\-]{0,9}$")
 
 
 def normalize_ticker(symbol: str) -> str:

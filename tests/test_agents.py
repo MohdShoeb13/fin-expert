@@ -169,6 +169,14 @@ class TestGoalPlanning:
         res = agent.respond("Help me plan for retirement")
         assert res.data == {}  # no projection without required params
 
+    def test_zero_monthly_contribution_is_valid(self, fake_llm):
+        # $0/month is a legitimate value (lump-sum-only growth), not "missing".
+        agent = GoalPlanningAgent(llm=fake_llm)
+        res = agent.respond("I want to save $100k in 10 years with $0 per month")
+        proj = res.data["projection"]
+        assert proj["monthly_contribution"] == 0
+        assert proj["target_amount"] == 100_000
+
     def test_kwargs_override_query(self, fake_llm):
         agent = GoalPlanningAgent(llm=fake_llm)
         res = agent.respond(

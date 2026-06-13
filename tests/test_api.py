@@ -89,6 +89,20 @@ class TestMarketEndpoints:
         res = client.get("/api/market/ZZZZ")
         assert res.status_code == 503
 
+    def test_quote_survives_history_failure(self, patched_market):
+        from src.data.market_data import MarketDataUnavailable
+
+        def boom(symbol, period="6mo"):
+            raise MarketDataUnavailable("history down")
+
+        patched_market.get_history = boom
+        res = client.get("/api/market/AAPL")
+        assert res.status_code == 200
+        body = res.json()
+        assert body["quote"]["symbol"] == "AAPL"
+        assert body["history"] == []
+        assert body["history_unavailable"] is True
+
     def test_news(self, patched_market):
         res = client.get("/api/market/AAPL/news")
         assert res.status_code == 200

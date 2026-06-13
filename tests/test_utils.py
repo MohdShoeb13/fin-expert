@@ -15,12 +15,16 @@ class TestNormalizeTicker:
             ("BRK.B", "BRK.B"),
             ("BTC-USD", "BTC-USD"),
             ("A", "A"),
+            ("^GSPC", "^GSPC"),  # index symbols (S&P 500)
+            ("^IXIC", "^IXIC"),  # Nasdaq Composite
+            ("^DJI", "^DJI"),    # Dow Jones
+            ("^gspc", "^GSPC"),
         ],
     )
     def test_valid(self, raw, expected):
         assert normalize_ticker(raw) == expected
 
-    @pytest.mark.parametrize("raw", ["", "  ", "123", "$AAPL", "DROP TABLE", "TOOLONGTICKER"])
+    @pytest.mark.parametrize("raw", ["", "  ", "123", "$AAPL", "DROP TABLE", "TOOLONGTICKER", "^", "^123"])
     def test_invalid_raises(self, raw):
         with pytest.raises(ValueError, match="Invalid ticker"):
             normalize_ticker(raw)

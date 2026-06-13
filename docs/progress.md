@@ -3,7 +3,7 @@
 Capstone: **AI Finance Assistant** — multi-agent financial education system.
 This file tracks what has been built so far. Update it as work progresses.
 
-_Last updated: 2026-06-11_
+_Last updated: 2026-06-13_
 
 ## Technology Decisions (locked in)
 
@@ -123,6 +123,14 @@ All extend `base_agent.py` (LLM from registry, shared guardrails, mandatory educ
 - Motion layer (`frontend/src/motion.tsx`): `FadeIn`, `Stagger`/`StaggerItem`, `AnimatedNumber` (spring count-up); `MotionConfig reducedMotion="user"` respects OS settings.
 - Per-component: sliding tab pill (`layoutId`), spring-in chat messages, animated 3-dot typing indicator, staggered metric cards with count-up numbers on Portfolio/Market/Goals, chart + news reveals.
 - **Verified with headless Chrome (Playwright)**: screenshots of all 4 tabs with live data; chat conversation survives tab switches (regression check passed); no console errors (one benign favicon 404). `npm run build` passes TS strict; bundle 844 kB minified / 246 kB gzip (+130 kB raw for framer-motion). Backend suite still 162 passed / 94%.
+
+### 13. Code-review fixes ✅ (2026-06-13)
+Addressed all four findings from `test/review.md` (manual review):
+- **Major — index tickers rejected by validation**: `normalize_ticker()` regex now allows a leading `^` (`src/utils/validators.py`), so `^GSPC`/`^IXIC`/`^DJI` extracted by the market agent reach yFinance instead of raising. Added valid/invalid index cases to `tests/test_utils.py`.
+- **Major — `$0/month` treated as missing**: goal planning now checks presence (`is not None`) not truthiness (`src/agents/goal_planning.py`), so a legitimate zero monthly contribution produces a projection. New test in `tests/test_agents.py`.
+- **Minor — market endpoint lost a valid quote on history failure**: `/api/market/{symbol}` now fetches quote and history in separate try blocks; if only history fails it returns the quote with `history: []` and `history_unavailable: true` (`src/web_app/main.py`). The Market tab shows a notice instead of an empty chart. New test in `tests/test_api.py`.
+- **Minor — generated build metadata tracked**: `frontend/tsconfig.tsbuildinfo` removed from git and added to `.gitignore`.
+- Suite now **174 passed, ~94% coverage**; frontend builds clean.
 
 ### 12. Streaming chat (SSE) ✅ (2026-06-11)
 - **`POST /api/chat/stream`** — ChatGPT-style token streaming. LangGraph `stream_mode=["updates","messages"]` in `stream_turn()` (`src/workflow/graph.py`); event protocol: `route` (agent badge appears immediately) → `token`× n → `done` (full response with disclaimer + citations), `error` on failure. Router tokens and full-message state updates are filtered out (`AIMessageChunk` check).
