@@ -1,4 +1,13 @@
 // Thin typed client over the FastAPI backend.
+//
+// In dev, requests use relative "/api/..." paths and Vite proxies them.
+// In production (Vercel) set VITE_API_BASE to the backend origin
+// (e.g. https://fin-expert-api.onrender.com); it is prefixed onto every API path.
+const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
+
+/** Prefix a backend-relative "/api/..." path with the configured API base. */
+export const apiUrl = (path: string): string =>
+  path.startsWith('/api') ? `${API_BASE}${path}` : path
 
 export interface Holding {
   symbol: string
@@ -82,7 +91,7 @@ export interface GoalProjection {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   })
@@ -107,7 +116,7 @@ async function chatStream(
   handlers: StreamHandlers,
   holdings?: Holding[],
 ): Promise<void> {
-  const res = await fetch('/api/chat/stream', {
+  const res = await fetch(apiUrl('/api/chat/stream'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, session_id: sessionId, holdings }),

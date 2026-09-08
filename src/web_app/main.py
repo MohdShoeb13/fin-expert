@@ -13,6 +13,7 @@ Endpoints:
 from __future__ import annotations
 
 import json
+import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -31,9 +32,17 @@ logger = get_logger(__name__)
 
 app = FastAPI(title="AI Finance Assistant", version="1.0.0")
 
+# Allowed origins come from config.yaml, plus any set via the CORS_ORIGINS env
+# var (comma-separated) so the deployed frontend origin (e.g. a Vercel URL) can
+# be added at runtime without rebuilding the image.
+_cors_origins = list(get_config().get("server.cors_origins", ["http://localhost:5173"]))
+_cors_origins += [
+    o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_config().get("server.cors_origins", ["http://localhost:5173"]),
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

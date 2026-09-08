@@ -1,0 +1,35 @@
+# Render blueprint for the fin-expert FastAPI backend.
+# Deploy: Render Dashboard -> New -> Blueprint -> pick this repo.
+# The frontend is deployed separately to Vercel.
+#
+# NOTE ON MEMORY: the image bundles a ~90MB sentence-transformers model and a
+# FAISS index (built at Docker build time). Loading it at runtime can exceed the
+# free plan's 512MB RAM. If the service crashes on boot with OOM, upgrade `plan`
+# to `starter` (paid). RAG (Finance Q&A / Tax) needs the model; other endpoints
+# (portfolio, goals, market) do not.
+services:
+  - type: web
+    name: fin-expert-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    disk:
+      name: fin-expert-data
+      mountPath: /app/.checkpoints
+      sizeGB: 1
+    envVars:
+      # At least one LLM key is required for /api/chat.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      # Optional market-data fallback.
+      - key: ALPHAVANTAGE_API_KEY
+        sync: false
+      # Set to your Vercel frontend URL after it deploys, e.g.
+      # https://fin-expert.vercel.app
+      - key: CORS_ORIGINS
+        sync: false
